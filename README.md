@@ -42,6 +42,7 @@ Es una versión jugable del Tetris clásico con todas las mecánicas que esperar
 - **Sistema de puntuación** clásico de Tetris (100 / 300 / 500 / 800 multiplicado por nivel).
 - **Niveles** que aumentan cada 10 líneas y aceleran la caída.
 - **Pausa** y **Game Over** con opción de reinicio.
+- **Modo claro / oscuro**: botón en la esquina superior derecha. Por defecto es oscuro y la elección se recuerda entre sesiones (`localStorage`).
 
 ---
 
@@ -86,6 +87,8 @@ Después abre `http://localhost:8000` en el navegador.
 | `Espacio` | Hard drop (caída instantánea)     |
 | `P`       | Pausar / reanudar                 |
 
+Además, el botón **☀️ Modo claro / 🌙 Modo oscuro** (arriba a la derecha) cambia el tema con el ratón.
+
 ---
 
 ## Cómo funciona
@@ -102,7 +105,7 @@ Define la estructura visual:
 
 ### 2. `style.css`
 
-Aporta el aspecto visual con estética _dark / retro arcade_: fondo oscuro, tipografía monoespaciada para los marcadores y _backdrop blur_ en los overlays.
+Aporta el aspecto visual con estética _dark / retro arcade_: fondo oscuro, tipografía monoespaciada para los marcadores y _backdrop blur_ en los overlays. Todos los colores son variables CSS en `:root`; el tema claro las redefine bajo `:root[data-theme="light"]`.
 
 ### 3. `game.js`
 
@@ -117,6 +120,7 @@ Contiene toda la lógica del juego. A grandes rasgos:
 - **Puntuación**: usa la tabla clásica `[0, 100, 300, 500, 800]` multiplicada por el nivel actual; el hard drop suma 2 puntos por celda recorrida y el soft drop 1 punto por fila.
 - **Nivel y velocidad**: el nivel sube cada 10 líneas; la velocidad de caída se calcula como `max(100, 1000 − (level − 1) × 90)` milisegundos.
 - **Ghost piece** (`ghostY`): proyecta la posición final de la pieza actual hacia abajo y la dibuja con `globalAlpha = 0.2`.
+- **Tema** (`applyTheme` / `toggleTheme`): cambia `data-theme` en `<html>`, actualiza el color de la cuadrícula del canvas y guarda la preferencia en `localStorage` (clave `tetris-theme`). Un script inline en `index.html` aplica el tema guardado antes del primer pintado.
 
 ### Flujo del juego
 
@@ -157,7 +161,7 @@ Cuando una pieza recién generada ya colisiona al aparecer (`spawn`), se dispara
 ```
 03-tetris/
 ├── index.html      # Estructura del DOM y canvas
-├── style.css       # Estilos del juego (dark theme)
+├── style.css       # Estilos del juego (temas oscuro y claro)
 ├── game.js         # Toda la lógica del Tetris (~300 líneas)
 └── README.md
 ```

@@ -303,13 +303,38 @@ document.addEventListener('keydown', e => {
 
 restartBtn.addEventListener('click', init);
 
-function toggleTheme() {
-  const light = document.documentElement.dataset.theme !== 'light';
-  document.documentElement.dataset.theme = light ? 'light' : 'dark';
+// ---- Tema claro / oscuro ----
+const THEME_KEY = 'tetris-theme';
+
+function loadTheme() {
+  try {
+    return localStorage.getItem(THEME_KEY) === 'light' ? 'light' : 'dark';
+  } catch (e) {
+    return 'dark'; // almacenamiento bloqueado (modo privado, etc.)
+  }
+}
+
+function saveTheme(theme) {
+  try {
+    localStorage.setItem(THEME_KEY, theme);
+  } catch (e) {
+    // sin persistencia; el toggle sigue funcionando durante la sesión
+  }
+}
+
+function applyTheme(theme) {
+  const light = theme === 'light';
+  document.documentElement.dataset.theme = theme;
   themeBtn.textContent = light ? '🌙 Modo oscuro' : '☀️ Modo claro';
   themeBtn.setAttribute('aria-pressed', String(light));
   gridColor = getComputedStyle(document.documentElement).getPropertyValue('--grid').trim();
   if (paused || gameOver) draw();
+}
+
+function toggleTheme() {
+  const theme = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+  applyTheme(theme);
+  saveTheme(theme);
 }
 
 themeBtn.addEventListener('click', e => {
@@ -317,4 +342,5 @@ themeBtn.addEventListener('click', e => {
   toggleTheme();
 });
 
+applyTheme(loadTheme());
 init();

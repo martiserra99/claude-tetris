@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Tetris</title>
   <link rel="stylesheet" href="style.css" />
+  <script>
+    // Aplica el tema guardado antes del primer pintado (evita el flash oscuro). game.js lo gestiona después.
+    try { if (localStorage.getItem('tetris-theme') === 'light') document.documentElement.dataset.theme = 'light'; } catch (e) {}
+  </script>
 </head>
 <body>
   <button id="theme-toggle" class="theme-toggle" type="button" aria-pressed="false">☀️ Modo claro</button>
