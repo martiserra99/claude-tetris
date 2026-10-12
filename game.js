@@ -243,6 +243,8 @@ function togglePause() {
 }
 
 function loop(ts) {
+  // Frame rezagado tras endGame()/togglePause(): no avanzar ni reprogramar.
+  if (gameOver || paused) return;
   const dt = ts - lastTime;
   lastTime = ts;
   dropAccum += dt;
@@ -252,6 +254,11 @@ function loop(ts) {
       current.y++;
     } else {
       lockPiece();
+      // Si al bloquear la pieza spawn() ha terminado la partida, endGame() no
+      // puede cancelar este frame (ya se está ejecutando). Pintamos el estado
+      // final y salimos sin pedir otro frame; si no, el bucle seguiría vivo y
+      // apilaría piezas sobre el tablero con gameOver = true.
+      if (gameOver) { draw(); return; }
     }
   }
   draw();
