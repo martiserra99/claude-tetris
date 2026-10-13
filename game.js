@@ -108,7 +108,7 @@ function clearLines() {
   if (cleared) {
     lines += cleared;
     score += (LINE_SCORES[cleared] || 0) * level;
-    level = Math.floor(lines / 10) + 1;
+    level = baseLevel + Math.floor(lines / 10);
     dropInterval = Math.max(100, 1000 - (level - 1) * 90);
     updateHUD();
   }
@@ -236,10 +236,8 @@ function togglePause() {
     loop(lastTime);
   } else {
     cancelAnimationFrame(animId);
-    overlayTitle.textContent = 'PAUSA';
-    overlayScore.textContent = '';
-    overlay.classList.remove('hidden');
   }
+  setPauseMenu(paused);
 }
 
 function loop(ts) {
@@ -269,22 +267,25 @@ function init() {
   board = createBoard();
   score = 0;
   lines = 0;
-  level = 1;
+  level = baseLevel = startLevel;
   paused = false;
   gameOver = false;
-  dropInterval = 1000;
+  dropInterval = Math.max(100, 1000 - (level - 1) * 90);
   dropAccum = 0;
   lastTime = performance.now();
   next = randomPiece();
   spawn();
   updateHUD();
   overlay.classList.add('hidden');
+  setPauseMenu(false);
   cancelAnimationFrame(animId);
   animId = requestAnimationFrame(loop);
 }
 
 document.addEventListener('keydown', e => {
-  if (e.code === 'KeyP') { togglePause(); return; }
+  if (paused && e.target === pauseStartLevel) return; // el <select> gestiona sus teclas (flechas, Esc)
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (paused) blockGameKeys(e);
   if (paused || gameOver) return;
   switch (e.code) {
     case 'ArrowLeft':
@@ -347,6 +348,91 @@ function toggleTheme() {
 themeBtn.addEventListener('click', e => {
   e.currentTarget.blur(); // evita que Space reactive el botón
   toggleTheme();
+});
+
+// ---- Menú de pausa ----
+const START_LEVEL_KEY = 'tetris-start-level';
+const MAX_START_LEVEL = 15;
+const pauseMenu = document.getElementById('pause-menu');
+const pauseResumeBtn = document.getElementById('pause-resume-btn');
+const pauseRestartBtn = document.getElementById('pause-restart-btn');
+const pauseControlsBtn = document.getElementById('pause-controls-btn');
+const pauseControls = document.getElementById('pause-controls');
+const pauseStartLevel = document.getElementById('pause-start-level');
+const GAME_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowDown', 'ArrowUp', 'Space', 'KeyX']);
+
+// Nivel con el que arranca la próxima partida (1–MAX_START_LEVEL). init() lo copia a
+// baseLevel, que es el que usa clearLines(): cambiar el selector no altera la partida en curso.
+let startLevel = loadStartLevel();
+let baseLevel;
+
+function clampStartLevel(value) {
+  const n = parseInt(value, 10);
+  if (!Number.isInteger(n)) return 1;
+  return Math.min(MAX_START_LEVEL, Math.max(1, n));
+}
+
+function loadStartLevel() {
+  try {
+    return clampStartLevel(localStorage.getItem(START_LEVEL_KEY));
+  } catch (e) {
+    return 1; // almacenamiento bloqueado (modo privado, etc.)
+  }
+}
+
+function saveStartLevel(value) {
+  try {
+    localStorage.setItem(START_LEVEL_KEY, String(value));
+  } catch (e) {
+    // sin persistencia; el selector sigue funcionando durante la sesión
+  }
+}
+
+function setPauseMenu(open) {
+  pauseMenu.classList.toggle('hidden', !open);
+  if (open) pauseResumeBtn.focus();
+  else setPauseControls(false);
+}
+
+function setPauseControls(open) {
+  pauseControls.classList.toggle('hidden', !open);
+  pauseControlsBtn.setAttribute('aria-expanded', String(open));
+  pauseControlsBtn.textContent = open ? 'Ocultar controles' : 'Ver controles';
+}
+
+// Con el menú abierto, las teclas del juego no deben hacer scroll ni mover nada al
+// reanudar. Space sigue activando el botón del menú que tenga el foco (uso con teclado).
+function blockGameKeys(e) {
+  if (e.code === 'Space' && pauseMenu.contains(e.target)) return;
+  if (GAME_KEYS.has(e.code)) e.preventDefault();
+}
+
+for (let i = 1; i <= MAX_START_LEVEL; i++) {
+  const opt = document.createElement('option');
+  opt.value = String(i);
+  opt.textContent = String(i);
+  pauseStartLevel.appendChild(opt);
+}
+pauseStartLevel.value = String(startLevel);
+
+pauseStartLevel.addEventListener('change', e => {
+  startLevel = clampStartLevel(e.currentTarget.value);
+  saveStartLevel(startLevel);
+});
+
+pauseResumeBtn.addEventListener('click', e => {
+  e.currentTarget.blur(); // evita que Space reactive el botón
+  togglePause();
+});
+
+pauseRestartBtn.addEventListener('click', e => {
+  e.currentTarget.blur();
+  init();
+});
+
+pauseControlsBtn.addEventListener('click', e => {
+  e.currentTarget.blur();
+  setPauseControls(pauseControls.classList.contains('hidden'));
 });
 
 applyTheme(loadTheme());

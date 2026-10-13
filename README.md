@@ -41,7 +41,8 @@ Es una versión jugable del Tetris clásico con todas las mecánicas que esperar
 - **Vista previa** de la siguiente pieza.
 - **Sistema de puntuación** clásico de Tetris (100 / 300 / 500 / 800 multiplicado por nivel).
 - **Niveles** que aumentan cada 10 líneas y aceleran la caída.
-- **Pausa** y **Game Over** con opción de reinicio.
+- **Game Over** con opción de reinicio.
+- **Menú de pausa** (`P` o `Esc`) con opciones reales: reanudar, reiniciar sin recargar, ver la lista de controles y elegir el **nivel inicial** (1–15) de la próxima partida; la elección se recuerda entre sesiones (`localStorage`). Mientras el menú está abierto las teclas del juego quedan bloqueadas.
 - **Modo claro / oscuro**: botón en la esquina superior derecha. Por defecto es oscuro y la elección se recuerda entre sesiones (`localStorage`).
 
 ---
@@ -85,7 +86,7 @@ Después abre `http://localhost:8000` en el navegador.
 | `↑` o `X` | Rotar la pieza en sentido horario |
 | `↓`       | Soft drop (bajar más rápido)      |
 | `Espacio` | Hard drop (caída instantánea)     |
-| `P`       | Pausar / reanudar                 |
+| `P` / `Esc` | Pausar / reanudar (abre el menú de pausa) |
 
 Además, el botón **☀️ Modo claro / 🌙 Modo oscuro** (arriba a la derecha) cambia el tema con el ratón.
 
@@ -101,7 +102,7 @@ Define la estructura visual:
 
 - Un `<canvas id="board">` de **300 × 600** píxeles donde se renderiza el tablero.
 - Un panel lateral con `SCORE`, `LINES`, `LEVEL`, vista de la siguiente pieza y la lista de controles.
-- Un overlay para los estados **PAUSA** y **GAME OVER**.
+- Un overlay para **GAME OVER** y otro independiente (`#pause-menu`) para el **menú de pausa**.
 
 ### 2. `style.css`
 
@@ -118,8 +119,9 @@ Contiene toda la lógica del juego. A grandes rasgos:
 - **Game loop** (`loop`): basado en `requestAnimationFrame`, acumula el tiempo transcurrido y baja la pieza una fila cuando se supera `dropInterval`.
 - **Limpieza de líneas** (`clearLines`): recorre el tablero de abajo hacia arriba; cada fila completa se elimina y se inserta una vacía en la cima.
 - **Puntuación**: usa la tabla clásica `[0, 100, 300, 500, 800]` multiplicada por el nivel actual; el hard drop suma 2 puntos por celda recorrida y el soft drop 1 punto por fila.
-- **Nivel y velocidad**: el nivel sube cada 10 líneas; la velocidad de caída se calcula como `max(100, 1000 − (level − 1) × 90)` milisegundos.
+- **Nivel y velocidad**: el nivel es `baseLevel + floor(lines / 10)` (sube cada 10 líneas a partir del nivel inicial elegido); la velocidad de caída se calcula como `max(100, 1000 − (level − 1) × 90)` milisegundos.
 - **Ghost piece** (`ghostY`): proyecta la posición final de la pieza actual hacia abajo y la dibuja con `globalAlpha = 0.2`.
+- **Menú de pausa** (`togglePause` / `setPauseMenu`): `P` o `Esc` detienen el bucle y muestran `#pause-menu`. El selector de nivel inicial guarda `startLevel` en `localStorage` (clave `tetris-start-level`) y `init()` lo copia a `baseLevel` como nivel de arranque de la nueva partida. Con el menú abierto, el `keydown` ignora las teclas del juego y les hace `preventDefault()` para que no hagan scroll ni activen botones.
 - **Tema** (`applyTheme` / `toggleTheme`): cambia `data-theme` en `<html>`, actualiza el color de la cuadrícula del canvas y guarda la preferencia en `localStorage` (clave `tetris-theme`). Un script inline en `index.html` aplica el tema guardado antes del primer pintado.
 
 ### Flujo del juego
@@ -137,7 +139,7 @@ init()
      ├─ draw()  (grid + tablero + ghost + pieza actual)
      └─ requestAnimationFrame(loop)
 
-   keydown → mover / rotar / soft-drop / hard-drop / pausa
+   keydown → mover / rotar / soft-drop / hard-drop / pausa (P o Esc)
 ```
 
 Cuando una pieza recién generada ya colisiona al aparecer (`spawn`), se dispara `endGame()` y se muestra el overlay de **Game Over**.
