@@ -112,6 +112,7 @@ function clearLines() {
     dropInterval = Math.max(100, 1000 - (level - 1) * 90);
     updateHUD();
   }
+  trackCombo(cleared); // récords: combo de limpiezas consecutivas
 }
 
 function ghostY() {
@@ -156,6 +157,7 @@ function updateHUD() {
   scoreEl.textContent = score.toLocaleString();
   linesEl.textContent = lines;
   levelEl.textContent = level;
+  comboEl.textContent = combo; // récords
 }
 
 function drawBlock(context, x, y, colorIndex, size, alpha) {
@@ -196,6 +198,8 @@ function draw() {
     for (let c = 0; c < COLS; c++)
       drawBlock(ctx, c, r, board[r][c], BLOCK);
 
+  if (!current) return; // pantalla de inicio: solo tablero vacío
+
   // ghost
   const gy = ghostY();
   for (let r = 0; r < current.shape.length; r++)
@@ -226,6 +230,7 @@ function endGame() {
   overlayTitle.textContent = 'GAME OVER';
   overlayScore.textContent = `Puntuación: ${score.toLocaleString()}`;
   overlay.classList.remove('hidden');
+  showGameOverRecords(); // récords: tabla + alta de nombre si entra en el top
 }
 
 function togglePause() {
@@ -266,6 +271,7 @@ function loop(ts) {
 }
 
 function init() {
+  resetRecordsState(); // récords: combo, formulario y pantalla de inicio
   board = createBoard();
   score = 0;
   lines = 0;
@@ -350,4 +356,254 @@ themeBtn.addEventListener('click', e => {
 });
 
 applyTheme(loadTheme());
-init();
+
+// ---- Récords ----
+const RECORDS_KEY = 'tetris-records';
+const RECORDS_MAX = 5;
+const RECORDS_NAME_MAX = 12;
+
+const startScreen = document.getElementById('start-screen');
+const startRecordsEl = document.getElementById('start-records');
+const startBtn = document.getElementById('start-btn');
+const startResetBtn = document.getElementById('start-reset-btn');
+const comboEl = document.getElementById('records-combo');
+const recordsGameOver = document.getElementById('records-gameover');
+const recordsMessage = document.getElementById('records-message');
+const recordsForm = document.getElementById('records-form');
+const recordsNameInput = document.getElementById('records-name');
+const recordsSaveBtn = document.getElementById('records-save-btn');
+const recordsTableEl = document.getElementById('records-table');
+const recordsResetBtn = document.getElementById('records-reset-btn');
+
+let combo, maxCombo;     // combo actual y máximo de la partida (se resetean en init())
+let pendingEntry = null; // puntuación a la espera de nombre en el game over
+let records = loadRecords();
+
+function emptyRecords() {
+  return { scores: [], bestCombo: 0, maxLines: 0 };
+}
+
+function toCount(v) {
+  return Number.isFinite(v) && v >= 0 ? Math.floor(v) : 0;
+}
+
+// Devuelve siempre un objeto con la forma esperada, descartando datos corruptos.
+function sanitizeRecords(raw) {
+  const clean = emptyRecords();
+  if (!raw || typeof raw !== 'object') return clean;
+  if (Array.isArray(raw.scores)) {
+    clean.scores = raw.scores
+      .filter(e => e && typeof e === 'object' && typeof e.name === 'string' && Number.isFinite(e.score) && e.score > 0)
+      .map(e => ({
+        name: e.name.trim().slice(0, RECORDS_NAME_MAX) || 'Anónimo',
+        score: toCount(e.score),
+        lines: toCount(e.lines),
+        level: Math.max(1, toCount(e.level)),
+        date: typeof e.date === 'string' ? e.date : '',
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, RECORDS_MAX);
+  }
+  clean.bestCombo = toCount(raw.bestCombo);
+  clean.maxLines = toCount(raw.maxLines);
+  return clean;
+}
+
+function loadRecords() {
+  try {
+    return sanitizeRecords(JSON.parse(localStorage.getItem(RECORDS_KEY)));
+  } catch (e) {
+    return emptyRecords(); // JSON corrupto o almacenamiento bloqueado
+  }
+}
+
+function saveRecords() {
+  try {
+    localStorage.setItem(RECORDS_KEY, JSON.stringify(records));
+  } catch (e) {
+    // sin persistencia; los récords viven solo durante la sesión
+  }
+}
+
+function qualifies(s) {
+  if (s <= 0) return false;
+  return records.scores.length < RECORDS_MAX || s > records.scores[RECORDS_MAX - 1].score;
+}
+
+// Inserta la entrada ordenada por puntuación (los empates van detrás) y devuelve su posición.
+function insertRecord(entry) {
+  let i = records.scores.findIndex(e => e.score < entry.score);
+  if (i === -1) i = records.scores.length;
+  records.scores.splice(i, 0, entry);
+  records.scores.length = Math.min(records.scores.length, RECORDS_MAX);
+  return i < RECORDS_MAX ? i : -1;
+}
+
+// Máximos históricos de la partida actual (combo y líneas).
+function updateRecordMaxima() {
+  records.bestCombo = Math.max(records.bestCombo, maxCombo);
+  records.maxLines = Math.max(records.maxLines, lines);
+}
+
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = String(text);
+  return node;
+}
+
+// Pinta la tabla (top 5 + mejor combo + máx. líneas) en `container`,
+// resaltando la fila `highlightIndex` si es >= 0.
+function renderRecords(container, highlightIndex = -1) {
+  container.replaceChildren();
+  if (records.scores.length === 0) {
+    container.appendChild(el('p', 'records-empty', 'Todavía no hay récords. ¡Sé el primero!'));
+  } else {
+    const table = el('table', 'records-table');
+    const head = table.createTHead().insertRow();
+    ['#', 'Nombre', 'Puntos', 'Líneas', 'Nivel'].forEach(h => head.appendChild(el('th', null, h)));
+    const body = table.createTBody();
+    records.scores.forEach((e, i) => {
+      const row = body.insertRow();
+      if (i === highlightIndex) row.classList.add('records-row--new');
+      if (e.date) row.title = new Date(e.date).toLocaleString();
+      [i + 1, e.name, e.score.toLocaleString(), e.lines, e.level]
+        .forEach(v => row.appendChild(el('td', null, v)));
+    });
+    container.appendChild(table);
+  }
+  const stats = el('p', 'records-stats');
+  stats.appendChild(el('span', null, `Mejor combo: ${records.bestCombo}`));
+  stats.appendChild(el('span', null, `Máx. líneas: ${records.maxLines}`));
+  container.appendChild(stats);
+}
+
+// Llamado desde clearLines() en cada bloqueo de pieza.
+function trackCombo(cleared) {
+  combo = cleared > 0 ? combo + 1 : 0;
+  maxCombo = Math.max(maxCombo, combo);
+  comboEl.textContent = combo;
+}
+
+// Llamado desde endGame(): actualiza máximos históricos y muestra la tabla en el overlay.
+function showGameOverRecords() {
+  records = loadRecords(); // por si otra pestaña ha guardado mientras tanto
+  updateRecordMaxima();
+  saveRecords();
+  pendingEntry = null;
+  if (qualifies(score)) {
+    pendingEntry = { name: '', score, lines, level, date: '' };
+    recordsMessage.textContent = '¡Has entrado en el top 5! Escribe tu nombre:';
+    recordsNameInput.value = '';
+    recordsForm.classList.remove('hidden');
+  } else {
+    recordsMessage.textContent = '';
+    recordsForm.classList.add('hidden');
+  }
+  renderRecords(recordsTableEl);
+  recordsGameOver.classList.remove('hidden');
+  if (pendingEntry) recordsNameInput.focus();
+}
+
+function saveRecord() {
+  if (!pendingEntry) return;
+  const entry = {
+    ...pendingEntry,
+    name: recordsNameInput.value.trim().slice(0, RECORDS_NAME_MAX) || 'Anónimo',
+    date: new Date().toISOString(),
+  };
+  pendingEntry = null;
+  records = loadRecords();
+  updateRecordMaxima();
+  const index = insertRecord(entry);
+  saveRecords();
+  recordsForm.classList.add('hidden');
+  recordsMessage.textContent = '¡Récord guardado!';
+  renderRecords(recordsTableEl, index);
+}
+
+// Reset en dos clicks (sin confirm() nativo): el botón pasa a "¿Seguro?" y se
+// desarma solo a los 3 s o al pulsar cualquier otra cosa.
+function bindResetButton(btn) {
+  const label = btn.textContent;
+  let timer = null;
+  const disarm = () => {
+    clearTimeout(timer);
+    timer = null;
+    btn.textContent = label;
+    btn.classList.remove('records-reset--confirm');
+  };
+  btn.addEventListener('click', e => {
+    e.currentTarget.blur(); // evita que Space reactive el botón
+    if (timer === null) {
+      btn.textContent = '¿Seguro?';
+      btn.classList.add('records-reset--confirm');
+      timer = setTimeout(disarm, 3000);
+      return;
+    }
+    disarm();
+    records = emptyRecords();
+    saveRecords();
+    renderRecords(startRecordsEl);
+    renderRecords(recordsTableEl);
+  });
+  document.addEventListener('click', e => { if (timer !== null && e.target !== btn) disarm(); });
+  document.addEventListener('keydown', e => { if (timer !== null && e.target !== btn) disarm(); });
+}
+
+// Hook al principio de init(): estado nuevo de la partida y UI de récords oculta.
+function resetRecordsState() {
+  if (pendingEntry) saveRecord(); // Reiniciar sin guardar: se guarda con el nombre escrito (o "Anónimo")
+  combo = 0;
+  maxCombo = 0;
+  pendingEntry = null;
+  startScreen.classList.add('hidden');
+  recordsGameOver.classList.add('hidden');
+}
+
+// Arranque: tablero vacío debajo y pantalla de inicio con la tabla; sin loop ni pieza.
+function showStartScreen() {
+  cancelAnimationFrame(animId);
+  gameOver = true; // bloquea las teclas del juego hasta pulsar Jugar
+  paused = false;
+  current = undefined;
+  board = createBoard();
+  draw();
+  overlay.classList.add('hidden');
+  recordsGameOver.classList.add('hidden');
+  records = loadRecords();
+  renderRecords(startRecordsEl);
+  startScreen.classList.remove('hidden');
+}
+
+startBtn.addEventListener('click', e => {
+  e.currentTarget.blur();
+  init(); // init() oculta la pantalla de inicio vía resetRecordsState()
+});
+
+recordsSaveBtn.addEventListener('click', e => {
+  e.currentTarget.blur();
+  saveRecord();
+});
+
+recordsNameInput.maxLength = RECORDS_NAME_MAX;
+recordsNameInput.addEventListener('keydown', e => {
+  if (e.isComposing) return;
+  if (e.code === 'Enter' || e.code === 'NumpadEnter') {
+    e.preventDefault();
+    saveRecord();
+  }
+});
+
+// Enter en la pantalla de inicio = Jugar (salvo con foco en un botón/input, que ya disparan su click).
+document.addEventListener('keydown', e => {
+  if (e.code !== 'Enter' && e.code !== 'NumpadEnter') return;
+  if (startScreen.classList.contains('hidden')) return;
+  if (e.target instanceof HTMLButtonElement || e.target instanceof HTMLInputElement) return;
+  init();
+});
+
+bindResetButton(startResetBtn);
+bindResetButton(recordsResetBtn);
+
+showStartScreen();
