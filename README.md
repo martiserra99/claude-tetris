@@ -43,6 +43,7 @@ Es una versión jugable del Tetris clásico con todas las mecánicas que esperar
 - **Niveles** que aumentan cada 10 líneas y aceleran la caída.
 - **Pausa** y **Game Over** con opción de reinicio.
 - **Modo claro / oscuro**: botón en la esquina superior derecha. Por defecto es oscuro y la elección se recuerda entre sesiones (`localStorage`).
+- **Skins visuales**: selector junto al botón de tema con cuatro estilos — **Retro** (bloques planos, el estilo clásico), **Neón** (fondo negro y bloques con glow), **Pastel** (colores suaves y esquinas redondeadas) y **Pixel art** (textura de subceldas sobre cada bloque). El cambio es inmediato, también en pausa, y se recuerda entre sesiones (`localStorage`).
 
 ---
 
@@ -121,6 +122,7 @@ Contiene toda la lógica del juego. A grandes rasgos:
 - **Nivel y velocidad**: el nivel sube cada 10 líneas; la velocidad de caída se calcula como `max(100, 1000 − (level − 1) × 90)` milisegundos.
 - **Ghost piece** (`ghostY`): proyecta la posición final de la pieza actual hacia abajo y la dibuja con `globalAlpha = 0.2`.
 - **Tema** (`applyTheme` / `toggleTheme`): cambia `data-theme` en `<html>`, actualiza el color de la cuadrícula del canvas y guarda la preferencia en `localStorage` (clave `tetris-theme`). Un script inline en `index.html` aplica el tema guardado antes del primer pintado.
+- **Skins** (`SKINS` / `applySkin`): cada skin es un objeto con su paleta, fondo y color de cuadrícula opcionales y una función `drawBlock` propia. `drawBlock()` del juego delega en `currentSkin.drawBlock`, por lo que cambiar de skin solo sustituye constantes y la función de pintado, sin recargar. La preferencia se guarda en `localStorage` (clave `tetris-skin`).
 
 ### Flujo del juego
 
@@ -182,6 +184,17 @@ Algunos parámetros fáciles de tunear en `game.js`:
 | `dropInterval` | Velocidad inicial de caída en ms         | `1000`                |
 
 > Si cambias `COLS`, `ROWS` o `BLOCK`, recuerda ajustar también `width` y `height` del `<canvas id="board">` en `index.html` para que coincida (`COLS × BLOCK` × `ROWS × BLOCK`).
+
+### Añadir un skin
+
+Los skins viven en el objeto `SKINS` al final de `game.js`. Para añadir uno nuevo:
+
+1. Añade una entrada `SKINS.miSkin = { label, colors, canvasBg, grid, drawBlock(context, x, y, type, size, alpha) }`:
+   - `colors`: array de 8 posiciones (`null` en la 0 y un color por tipo de pieza 1–7).
+   - `canvasBg`: color de fondo del canvas, o `null` para respetar el `--canvas-bg` del tema claro/oscuro.
+   - `grid`: color de la cuadrícula, o `null` para usar la variable CSS `--grid`.
+   - `drawBlock`: pinta la celda `(x, y)` con `size` píxeles por lado; `alpha` ya viene resuelto (`0.2` para la pieza fantasma). Si usas `shadowBlur` u otros estados del contexto, restáuralos antes de salir.
+2. Añade la `<option value="miSkin">` correspondiente al `<select id="skin-select">` de `index.html` (etiqueta en español).
 
 ---
 
