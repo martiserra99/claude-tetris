@@ -216,3 +216,34 @@ kbd {
 #restart-btn:hover {
   background: var(--accent-hover);
 }
+
+/* ---- Skins ---- */
+.top-controls {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+/* Dentro del contenedor el botón de tema deja de posicionarse solo */
+.top-controls .theme-toggle {
+  position: static;
+}
+
+.skin-select {
+  background: var(--canvas-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.skin-select:hover {
+  border-color: var(--accent);
+}
