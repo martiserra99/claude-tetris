@@ -32,6 +32,10 @@
           <span class="label">LEVEL</span>
           <span class="value" id="level">1</span>
         </div>
+        <div class="panel-section">
+          <span class="label">COMBO</span>
+          <span class="value" id="records-combo">0</span>
+        </div>
 
         <div class="panel-section">
           <span class="label">NEXT</span>
@@ -55,7 +59,27 @@
       <div class="overlay-box">
         <p id="overlay-title">GAME OVER</p>
         <p id="overlay-score"></p>
+        <div id="records-gameover" class="records-gameover hidden">
+          <p id="records-message" class="records-message"></p>
+          <div id="records-form" class="records-form hidden">
+            <input id="records-name" type="text" maxlength="12" placeholder="Tu nombre" autocomplete="off" />
+            <button id="records-save-btn" class="records-btn" type="button">Guardar</button>
+          </div>
+          <div id="records-table" class="records"></div>
+          <button id="records-reset-btn" class="records-reset" type="button">Resetear récords</button>
+        </div>
         <button id="restart-btn">Reiniciar</button>
+      </div>
+    </div>
+
+    <div id="start-screen" class="overlay">
+      <div class="overlay-box">
+        <p class="start-title">TETRIS</p>
+        <p class="start-subtitle">RÉCORDS</p>
+        <div id="start-records" class="records"></div>
+        <button id="start-btn" class="records-btn" type="button">Jugar</button>
+        <button id="start-reset-btn" class="records-reset" type="button">Resetear récords</button>
+        <p class="start-hint"><kbd>Enter</kbd> para jugar</p>
       </div>
     </div>
   </div>
